@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PatchOrchestrator Architecture Diagram</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 40px;
+            background-color: #f8fafc;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #1e293b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PatchOrchestrator Architecture</h1>
+        <div class="mermaid">
+                graph LR
+                    %% Styling
+                    classDef user fill:#2563eb,color:#fff,stroke:#1d4ed8,stroke-width:2px;
+                    classDef ui fill:#8b5cf6,color:#fff,stroke:#7c3aed,stroke-width:2px;
+                    classDef engine fill:#d946ef,color:#fff,stroke:#c026d3,stroke-width:2px;
+                    classDef data fill:#10b981,color:#fff,stroke:#059669,stroke-width:2px;
+                    classDef target fill:#f59e0b,color:#fff,stroke:#d97706,stroke-width:2px;
+                    
+                    %% Actors
+                    Admin(("👨‍💻 IT Admin")):::user
+                    
+                    subgraph "PatchOrchestrator Application Server"
+                        direction TB
+                        UI["🖥️ Web Dashboard<br/><small>(Spring MVC / Thymeleaf)</small>"]:::ui
+                        Logic["⚙️ Core Services & Scheduler<br/><small>(Job Queues & Approvals)</small>"]:::engine
+                        Executor["⚡ Execution Engine<br/><small>(JSch for SSH, winrm4j)</small>"]:::engine
+                        
+                        UI -- "1. Uploads Patch & Details" --> Logic
+                        Logic -- "2. Triggers patch cycle" --> Executor
+                    end
+
+                    subgraph "Infrastructure Layer"
+                        direction TB
+                        DB[("🐘 PostgreSQL DB<br/><small>(State & Audit Logs via JDBC)</small>")]:::data
+                        Vault[("🛡️ CyberArk<br/><small>(Fetches Secrets via REST API)</small>")]:::data
+                        Disk["📁 Local File System<br/><small>(Stores raw patch binaries)</small>"]:::data
+                    end
+
+                    subgraph "Endpoints"
+                        Win["🪟 Windows Targets<br/><small>(PowerShell hooks)</small>"]:::target
+                        Linux["🐧 Linux Targets<br/><small>(Bash hooks)</small>"]:::target
+                    end
+
+                    %% Admin to App
+                    Admin -- "HTTPS (8080)" --> UI
+                    
+                    %% Logic to Infrastructure
+                    Logic -. "Saves uploaded files" .-> Disk
+                    Logic -. "Reads/Writes metadata" .-> DB
+                    Logic -. "Retrieves target credentials" .-> Vault
+                    
+                    %% Engine to Targets
+                    Executor == "Uploads .msu & Installs<br/>(WinRM - Port 5985)" ===> Win
+                    Executor == "Uploads .rpm/.deb & Installs<br/>(SSH - Port 22)" ===> Linux
+        </div>
+    </div>
+</body>
+</html>

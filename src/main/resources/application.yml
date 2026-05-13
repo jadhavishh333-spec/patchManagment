@@ -1,0 +1,121 @@
+spring:
+  application:
+    name: Enterprise Patch Orchestration Platform
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/patch_management}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:Admin}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+  web:
+    resources:
+      cache:
+        period: 0
+  # ── Multipart / File Upload ────────────────────────────────────────────────
+  # Raise limits to allow large patch binaries (MSU files can be 500 MB+).
+  # Adjust max-file-size and max-request-size to suit your environment.
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 1024MB
+      max-request-size: 1024MB
+
+server:
+  port: 8082
+  error:
+    whitelabel:
+      enabled: false
+
+# Actuator / Health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# Logging
+logging:
+  level:
+    com.patchmgmt: TRACE
+    org.springframework.security: WARN
+    org.springframework.retry: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ─── Integration Settings ────────────────────────────────────────────────────
+integration:
+  # Master demo-mode switch — false → real SSH/WinRM/CyberArk used
+  demo-mode: false
+
+  cyberark:
+    enabled: false
+    base-url: https://cyberark.internal/AIMWebService/api/Accounts
+    app-id: PatchMgmtApp
+    safe: PatchMgmtSafe
+    connection-timeout-seconds: 10
+    read-timeout-seconds: 15
+    # Certificate verification (set to false for self-signed in lab)
+    verify-ssl: false
+
+  winrm:
+    enabled: false
+    port: 5985
+    use-https: false
+    timeout-seconds: 120
+    auth-scheme: basic   # basic | ntlm | kerberos
+
+  ssh:
+    enabled: true
+    port: 22
+    timeout-seconds: 120
+    known-hosts-check: false
+    strict-host-key-checking: false
+
+  # ── Local Credential Mode (dev/test without CyberArk) ────────────────────
+  # Used when: demo-mode=false AND cyberark.enabled=false
+  # SSH credentials are AES-256-GCM encrypted using this key before DB storage.
+  # Change this to any secret passphrase — keep it consistent!
+  local-credentials:
+    encryption-key: "PatchMgmt-KaliTest-2026-SecretKey"
+
+# ─── Patch Engine Settings ───────────────────────────────────────────────────
+patch:
+  # Directory on THIS server where manually-uploaded patch binaries are stored.
+  # Must be readable by the JVM process.  On Linux ensure the path is writable.
+  # The files are transferred FROM here to the target server at job-execution time.
+  upload:
+    dir: ./patch-uploads
+  scheduler:
+    enabled: true
+    cron: "0 * * * * *"   # Runs every minute — checks for approved+due jobs
+  execution:
+    max-retry-attempts: 3
+    retry-delay-seconds: 30
+    batch-size: 5
+    default-timeout-minutes: 30
+    thread-pool-size: 10

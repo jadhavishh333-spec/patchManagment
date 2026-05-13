@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Maintenance Windows')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Maintenance Windows')}"></div>
+    <div class="content-body">
+        <div th:replace="~{layout :: alerts}"></div>
+        <div class="page-actions">
+            <a th:href="@{/maintenance/new}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Window
+            </a>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-calendar-days me-2"></i>Maintenance Windows</h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Name</th><th>Type</th><th>Time</th><th>Day/Date</th><th>Environment</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="w : ${windows}" class="table-row-hover">
+                            <td>
+                                <span th:text="${w.name}" class="fw-600"></span>
+                                <small class="text-muted d-block" th:text="${w.description}"></small>
+                            </td>
+                            <td><span class="env-tag" th:text="${w.windowType}"></span></td>
+                            <td th:text="${w.startTime} + ' – ' + ${w.endTime}"></td>
+                            <td th:text="${w.dayOfWeek != null ? w.dayOfWeek : (w.startDate != null ? w.startDate : 'Daily')}"></td>
+                            <td><span class="env-tag" th:text="${w.environment ?: 'ALL'}"></span></td>
+                            <td>
+                                <span th:if="${w.active}" class="status-badge status-completed">Active</span>
+                                <span th:unless="${w.active}" class="status-badge status-cancelled">Inactive</span>
+                            </td>
+                            <td class="action-cell">
+                                <a th:href="@{/maintenance/{id}/edit(id=${w.id})}" class="btn-icon" title="Edit">
+                                    <i class="fas fa-pen"></i>
+                                </a>
+                                <form th:action="@{/maintenance/{id}/delete(id=${w.id})}" method="post" class="d-inline">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn-icon btn-icon-danger" title="Delete"
+                                            onclick="return confirm('Delete this maintenance window?')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(windows)}">
+                            <td colspan="7" class="empty-state">No maintenance windows configured.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

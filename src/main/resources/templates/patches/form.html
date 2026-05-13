@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Patch Form')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Patch Catalog')}"></div>
+    <div class="content-body">
+
+        <div class="pf-back-bar">
+            <a th:href="@{/patches}" class="pf-back-link">
+                <i class="fas fa-arrow-left"></i> Back to Catalog
+            </a>
+            <div class="pf-breadcrumb">
+                <span>Patches</span>
+                <i class="fas fa-chevron-right"></i>
+                <span th:text="${patch.id != null} ? 'Edit Patch' : 'New Patch'">New Patch</span>
+            </div>
+        </div>
+
+        <form th:action="${patch.id != null} ? @{/patches/{id}/edit(id=${patch.id})} : @{/patches/new}"
+              th:object="${patch}" method="post" enctype="multipart/form-data" id="patchForm">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <div class="pf-layout">
+
+                <!-- ═══ LEFT COLUMN — Core Info ═══ -->
+                <div class="pf-main">
+
+                    <!-- Card: Basic Info -->
+                    <div class="pf-card">
+                        <div class="pf-card-header">
+                            <div class="pf-card-icon pf-icon-blue">
+                                <i class="fas fa-shield-virus"></i>
+                            </div>
+                            <div>
+                                <h2 class="pf-card-title" th:text="${patch.id != null} ? 'Edit Patch' : 'New Patch'">New Patch</h2>
+                                <p class="pf-card-sub">Fill in patch metadata and optionally upload a binary</p>
+                            </div>
+                        </div>
+
+                        <div class="pf-field">
+                            <label class="pf-label">Patch Title <span class="pf-required">*</span></label>
+                            <input type="text" th:field="*{title}" class="pf-input"
+                                   placeholder="e.g. OpenSSL CVE-2024-0215 Fix"/>
+                            <div class="pf-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></div>
+                        </div>
+
+                        <div class="pf-field">
+                            <label class="pf-label">Patch ID / CVE
+                                <span class="pf-hint-tag">auto-generated if blank</span>
+                            </label>
+                            <input type="text" th:field="*{patchId}" class="pf-input"
+                                   placeholder="e.g. KB5031356 or CVE-2023-1234"/>
+                        </div>
+
+                        <div class="pf-row">
+                            <div class="pf-field">
+                                <label class="pf-label">OS Type <span class="pf-required">*</span></label>
+                                <div class="pf-select-wrap">
+                                    <select th:field="*{osType}" class="pf-input" id="osTypeSelect">
+                                        <option value="">Select OS…</option>
+                                        <option th:each="os : ${osTypes}" th:value="${os}" th:text="${os}"></option>
+                                    </select>
+                                    <i class="fas fa-chevron-down pf-select-arrow"></i>
+                                </div>
+                                <div class="pf-error" th:if="${#fields.hasErrors('osType')}" th:errors="*{osType}"></div>
+                            </div>
+                            <div class="pf-field">
+                                <label class="pf-label">Severity <span class="pf-required">*</span></label>
+                                <div class="pf-select-wrap">
+                                    <select th:field="*{severity}" class="pf-input" id="severitySelect">
+                                        <option value="">Select severity…</option>
+                                        <option th:each="s : ${severities}" th:value="${s}" th:text="${s}"></option>
+                                    </select>
+                                    <i class="fas fa-chevron-down pf-select-arrow"></i>
+                                </div>
+                                <div class="pf-error" th:if="${#fields.hasErrors('severity')}" th:errors="*{severity}"></div>
+                            </div>
+                        </div>
+
+                        <div class="pf-row">
+                            <div class="pf-field">
+                                <label class="pf-label">Release Date</label>
+                                <input type="datetime-local" th:field="*{releaseDate}" class="pf-input"/>
+                            </div>
+                            <div class="pf-field pf-field-center">
+                                <label class="pf-toggle-label">
+                                    <div class="pf-toggle-wrap">
+                                        <input type="checkbox" th:field="*{requiresReboot}" class="pf-toggle-input" id="rebootToggle"/>
+                                        <span class="pf-toggle-track"></span>
+                                    </div>
+                                    <div class="pf-toggle-text">
+                                        <span class="pf-toggle-title">Requires Reboot</span>
+                                        <span class="pf-toggle-sub">Server restart needed after install</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="pf-field">
+                            <label class="pf-label">Description</label>
+                            <textarea th:field="*{description}" class="pf-input pf-textarea" rows="3"
+                                      placeholder="Brief description of what this patch addresses…"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Card: Install Command -->
+                    <div class="pf-card">
+                        <div class="pf-card-header">
+                            <div class="pf-card-icon pf-icon-violet">
+                                <i class="fas fa-terminal"></i>
+                            </div>
+                            <div>
+                                <h2 class="pf-card-title">Install Command</h2>
+                                <p class="pf-card-sub">Leave blank to auto-detect from file extension</p>
+                            </div>
+                        </div>
+
+                        <!-- AI Suggestion Banner (injected by JS) -->
+                        <div id="suggest-banner" class="pf-suggest-banner" style="display:none;">
+                            <div class="pf-suggest-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                            <div class="pf-suggest-body" id="suggest-text"></div>
+                            <button type="button" class="pf-suggest-close" onclick="this.closest('#suggest-banner').style.display='none'">
+                                <i class="fas fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <div class="pf-field" style="margin-bottom:0">
+                            <div class="pf-code-wrap">
+                                <span class="pf-code-prompt">$</span>
+                                <textarea th:field="*{installCommand}" class="pf-code-input" rows="2"
+                                          placeholder='e.g. chmod +x {FILE} && bash {FILE}   ·   Use {FILE} for full remote path'></textarea>
+                            </div>
+                            <div class="pf-placeholder-chips">
+                                <span class="pf-chip" onclick="insertPlaceholder('{FILE}')"><code>{FILE}</code> full path</span>
+                                <span class="pf-chip" onclick="insertPlaceholder('{FILENAME}')"><code>{FILENAME}</code> filename only</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ═══ RIGHT COLUMN — File Upload ═══ -->
+                <div class="pf-sidebar">
+
+                    <!-- Drop Zone Card -->
+                    <div class="pf-card pf-upload-card" id="uploadCard">
+                        <div class="pf-card-header">
+                            <div class="pf-card-icon pf-icon-teal">
+                                <i class="fas fa-cloud-arrow-up"></i>
+                            </div>
+                            <div>
+                                <h2 class="pf-card-title">Binary Upload</h2>
+                                <p class="pf-card-sub">Optional — drag &amp; drop or browse</p>
+                            </div>
+                        </div>
+
+                        <!-- Existing file indicator -->
+                        <div th:if="${patch.filePath != null and !#strings.isEmpty(patch.filePath)}"
+                             class="pf-existing-file">
+                            <div class="pf-existing-icon"><i class="fas fa-file-circle-check"></i></div>
+                            <div class="pf-existing-info">
+                                <span class="pf-existing-name" th:text="${#strings.substringAfterLast(patch.filePath,'_')}">patch.sh</span>
+                                <span class="pf-existing-note">Upload below to replace</span>
+                            </div>
+                        </div>
+
+                        <!-- Drop Zone -->
+                        <div class="pf-dropzone" id="dropZone">
+                            <input type="file" name="patchFile" id="patchFile"
+                                   accept=".msu,.exe,.msi,.msp,.deb,.rpm,.sh,.tar,.gz,.tgz"
+                                   class="pf-drop-input"/>
+                            <div class="pf-drop-icon" id="dropIcon">
+                                <i class="fas fa-file-arrow-up"></i>
+                            </div>
+                            <div class="pf-drop-text" id="dropText">
+                                <strong>Drop file here</strong> or <span class="pf-drop-link">browse</span>
+                            </div>
+                            <div class="pf-drop-formats">
+                                <span class="pf-fmt-chip pf-fmt-win"><i class="fab fa-windows"></i> .msu .exe .msi</span>
+                                <span class="pf-fmt-chip pf-fmt-lnx"><i class="fab fa-linux"></i> .deb .rpm .sh</span>
+                            </div>
+                            <div class="pf-drop-selected" id="dropSelected" style="display:none;">
+                                <div class="pf-sel-icon"><i class="fas fa-file-code" id="selIcon"></i></div>
+                                <div class="pf-sel-info">
+                                    <span class="pf-sel-name" id="selName"></span>
+                                    <span class="pf-sel-size" id="selSize"></span>
+                                </div>
+                                <button type="button" class="pf-sel-remove" id="selRemove" title="Remove">
+                                    <i class="fas fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Deploy Path -->
+                        <div class="pf-field" style="margin-top:1rem;margin-bottom:0">
+                            <label class="pf-label">
+                                Deploy Path
+                                <span class="pf-hint-tag">on target server</span>
+                            </label>
+                            <div class="pf-mono-wrap">
+                                <span class="pf-mono-prefix"><i class="fas fa-folder-open"></i></span>
+                                <input type="text" th:field="*{deployPath}" class="pf-input pf-mono-input"
+                                       id="deployPathInput"
+                                       placeholder="/tmp/patches/"/>
+                            </div>
+                            <small class="pf-field-hint">
+                                Default: <code>C:\Patches\</code> Windows &nbsp;·&nbsp; <code>/tmp/patches/</code> Linux
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Format Reference Card -->
+                    <div class="pf-card pf-ref-card">
+                        <div class="pf-ref-title"><i class="fas fa-circle-info me-2"></i>Auto-Detection Rules</div>
+                        <div class="pf-ref-grid">
+                            <div class="pf-ref-row">
+                                <span class="pf-ref-ext pf-ext-sh">.sh</span>
+                                <code class="pf-ref-cmd">chmod +x {FILE} &amp;&amp; bash {FILE}</code>
+                            </div>
+                            <div class="pf-ref-row">
+                                <span class="pf-ref-ext pf-ext-deb">.deb</span>
+                                <code class="pf-ref-cmd">dpkg -i {FILE}</code>
+                            </div>
+                            <div class="pf-ref-row">
+                                <span class="pf-ref-ext pf-ext-rpm">.rpm</span>
+                                <code class="pf-ref-cmd">rpm -Uvh {FILE}</code>
+                            </div>
+                            <div class="pf-ref-row">
+                                <span class="pf-ref-ext pf-ext-msu">.msu</span>
+                                <code class="pf-ref-cmd">wusa.exe "{FILE}" /quiet</code>
+                            </div>
+                            <div class="pf-ref-row">
+                                <span class="pf-ref-ext pf-ext-exe">.exe</span>
+                                <code class="pf-ref-cmd">"{FILE}" /silent</code>
+                            </div>
+                            <div class="pf-ref-row">
+                                <span class="pf-ref-ext pf-ext-msi">.msi</span>
+                                <code class="pf-ref-cmd">msiexec.exe /i "{FILE}"</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pf-actions">
+                        <a th:href="@{/patches}" class="pf-btn pf-btn-ghost">
+                            <i class="fas fa-xmark"></i> Cancel
+                        </a>
+                        <button type="submit" class="pf-btn pf-btn-primary" id="submitBtn">
+                            <i class="fas fa-floppy-disk"></i>
+                            <span th:text="${patch.id != null} ? 'Save Changes' : 'Create Patch'">Create Patch</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </form>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+
+<style>
+/* ── Patch Form — Premium Layout ─────────────────────────────────────────── */
+.pf-back-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+.pf-back-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--text-muted, #94a3b8); font-size: 0.875rem;
+    text-decoration: none; transition: color .2s;
+}
+.pf-back-link:hover { color: var(--text-primary, #f1f5f9); }
+.pf-breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.8rem; color: var(--text-muted, #64748b);
+}
+.pf-breadcrumb i { font-size: 0.65rem; }
+
+.pf-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    align-items: start;
+}
+@media (max-width: 1024px) {
+    .pf-layout { grid-template-columns: 1fr; }
+}
+
+/* Cards */
+.pf-card {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid var(--border-color, rgba(255,255,255,0.07));
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    transition: box-shadow .2s;
+}
+.pf-card:hover { box-shadow: 0 4px 32px rgba(0,0,0,.25); }
+
+.pf-card-header {
+    display: flex; align-items: flex-start; gap: 14px; margin-bottom: 1.5rem;
+}
+.pf-card-icon {
+    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+}
+.pf-icon-blue   { background: rgba(99,102,241,.15); color: #818cf8; }
+.pf-icon-violet { background: rgba(167,139,250,.15); color: #a78bfa; }
+.pf-icon-teal   { background: rgba(20,184,166,.15);  color: #2dd4bf; }
+
+.pf-card-title { font-size: 1rem; font-weight: 600; margin: 0 0 2px; color: var(--text-primary, #f1f5f9); }
+.pf-card-sub   { font-size: 0.8rem; color: var(--text-muted, #64748b); margin: 0; }
+
+/* Fields */
+.pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.pf-field { margin-bottom: 1.1rem; }
+.pf-field-center { display: flex; align-items: center; }
+.pf-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.825rem; font-weight: 500;
+    color: var(--text-secondary, #94a3b8); margin-bottom: 6px;
+}
+.pf-required { color: #f87171; }
+.pf-hint-tag {
+    font-size: 0.72rem; font-weight: 400;
+    background: rgba(99,102,241,.12); color: #818cf8;
+    border-radius: 4px; padding: 1px 6px;
+}
+.pf-input {
+    width: 100%; background: rgba(15,23,42,.6);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 10px;
+    color: var(--text-primary, #f1f5f9); padding: 0.6rem 0.9rem;
+    font-size: 0.9rem; font-family: inherit; outline: none;
+    transition: border-color .2s, box-shadow .2s; box-sizing: border-box;
+}
+.pf-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,.2);
+}
+.pf-textarea { resize: vertical; min-height: 80px; }
+
+.pf-select-wrap { position: relative; }
+.pf-select-wrap select { appearance: none; }
+.pf-select-arrow {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: #64748b; pointer-events: none; font-size: 0.75rem;
+}
+
+.pf-error { color: #f87171; font-size: 0.8rem; margin-top: 4px; }
+.pf-field-hint { font-size: 0.78rem; color: #64748b; margin-top: 4px; display: block; }
+
+/* Toggle */
+.pf-toggle-label { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.pf-toggle-wrap { position: relative; flex-shrink: 0; }
+.pf-toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pf-toggle-track {
+    display: block; width: 44px; height: 24px; border-radius: 12px;
+    background: rgba(255,255,255,.1); transition: background .2s; cursor: pointer;
+    position: relative;
+}
+.pf-toggle-track::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #94a3b8; transition: transform .2s, background .2s;
+}
+.pf-toggle-input:checked + .pf-toggle-track { background: #6366f1; }
+.pf-toggle-input:checked + .pf-toggle-track::after { transform: translateX(20px); background: #fff; }
+.pf-toggle-title { font-size: 0.875rem; font-weight: 500; color: var(--text-primary, #f1f5f9); display: block; }
+.pf-toggle-sub   { font-size: 0.75rem; color: #64748b; display: block; }
+
+/* Code input */
+.pf-code-wrap {
+    display: flex; align-items: flex-start; gap: 0;
+    background: rgba(15,23,42,.8); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px; overflow: hidden; transition: border-color .2s, box-shadow .2s;
+}
+.pf-code-wrap:focus-within {
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 3px rgba(167,139,250,.2);
+}
+.pf-code-prompt {
+    padding: 0.65rem 0.8rem; font-size: 0.9rem; font-weight: 700;
+    color: #a78bfa; font-family: 'Courier New', monospace;
+    border-right: 1px solid rgba(255,255,255,.07); flex-shrink: 0;
+    line-height: 1.5;
+}
+.pf-code-input {
+    flex: 1; border: none; background: transparent; outline: none;
+    color: #e2e8f0; padding: 0.65rem 0.9rem;
+    font-family: 'Courier New', monospace; font-size: 0.875rem; resize: vertical;
+}
+.pf-placeholder-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.pf-chip {
+    display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+    background: rgba(167,139,250,.1); border: 1px solid rgba(167,139,250,.2);
+    border-radius: 6px; padding: 2px 8px; font-size: 0.78rem; color: #c4b5fd;
+    transition: background .2s;
+}
+.pf-chip:hover { background: rgba(167,139,250,.2); }
+.pf-chip code { font-size: 0.78rem; background: none; color: inherit; }
+
+/* Suggestion Banner */
+.pf-suggest-banner {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: linear-gradient(135deg, rgba(20,184,166,.12), rgba(99,102,241,.08));
+    border: 1px solid rgba(45,212,191,.25); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 1rem; animation: pf-slide-in .3s ease;
+}
+@keyframes pf-slide-in { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:none; } }
+.pf-suggest-icon { color: #2dd4bf; font-size: 1.1rem; margin-top: 1px; flex-shrink: 0; }
+.pf-suggest-body { flex: 1; font-size: 0.83rem; color: #a5f3fc; line-height: 1.5; }
+.pf-suggest-body code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 1px 5px; color: #f0fdfa; }
+.pf-suggest-body strong { color: #fff; }
+.pf-suggest-close {
+    background: none; border: none; color: #64748b; cursor: pointer;
+    font-size: 0.9rem; padding: 0; line-height: 1; flex-shrink: 0;
+    transition: color .2s;
+}
+.pf-suggest-close:hover { color: #f1f5f9; }
+
+/* Drop Zone */
+.pf-dropzone {
+    position: relative; border: 2px dashed rgba(255,255,255,.12);
+    border-radius: 12px; padding: 1.5rem; text-align: center;
+    background: rgba(15,23,42,.4); cursor: pointer;
+    transition: border-color .2s, background .2s;
+    min-height: 160px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+}
+.pf-dropzone:hover, .pf-dropzone.drag-over {
+    border-color: #2dd4bf;
+    background: rgba(20,184,166,.06);
+}
+.pf-drop-input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; z-index: 2;
+}
+.pf-drop-icon { font-size: 2rem; color: #334155; transition: color .2s, transform .2s; }
+.pf-dropzone:hover .pf-drop-icon, .pf-dropzone.drag-over .pf-drop-icon {
+    color: #2dd4bf; transform: scale(1.1);
+}
+.pf-drop-text { font-size: 0.875rem; color: #64748b; }
+.pf-drop-link { color: #2dd4bf; font-weight: 500; }
+.pf-drop-formats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.pf-fmt-chip {
+    font-size: 0.72rem; border-radius: 6px; padding: 2px 8px;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.pf-fmt-win { background: rgba(14,165,233,.12); color: #38bdf8; border: 1px solid rgba(14,165,233,.2); }
+.pf-fmt-lnx { background: rgba(234,179,8,.1); color: #facc15; border: 1px solid rgba(234,179,8,.2); }
+
+/* Selected file display */
+.pf-drop-selected {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: rgba(20,184,166,.1); border-radius: 10px;
+    padding: 10px 12px; text-align: left;
+}
+.pf-sel-icon { font-size: 1.5rem; color: #2dd4bf; }
+.pf-sel-info { flex: 1; min-width: 0; }
+.pf-sel-name {
+    display: block; font-weight: 600; font-size: 0.875rem;
+    color: #f1f5f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-sel-size { display: block; font-size: 0.75rem; color: #64748b; }
+.pf-sel-remove {
+    background: rgba(239,68,68,.15); border: none; color: #f87171;
+    border-radius: 8px; width: 28px; height: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; flex-shrink: 0; transition: background .2s;
+}
+.pf-sel-remove:hover { background: rgba(239,68,68,.3); }
+
+/* Existing file */
+.pf-existing-file {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.2);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+}
+.pf-existing-icon { color: #22c55e; font-size: 1.25rem; }
+.pf-existing-name { display: block; font-weight: 600; font-size: 0.875rem; color: #f1f5f9; }
+.pf-existing-note { display: block; font-size: 0.75rem; color: #64748b; }
+
+/* Mono path input */
+.pf-mono-wrap { display: flex; align-items: center; }
+.pf-mono-prefix {
+    padding: 0.6rem 0.85rem; background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1); border-right: none;
+    border-radius: 10px 0 0 10px; color: #64748b; font-size: 0.9rem;
+}
+.pf-mono-input {
+    border-radius: 0 10px 10px 0 !important;
+    font-family: 'Courier New', monospace !important; font-size: 0.85rem !important;
+}
+
+/* Reference card */
+.pf-ref-card { padding: 1.1rem 1.25rem; margin-bottom: 1.25rem; }
+.pf-ref-title { font-size: 0.82rem; font-weight: 600; color: #64748b; margin-bottom: 0.75rem; }
+.pf-ref-grid { display: flex; flex-direction: column; gap: 6px; }
+.pf-ref-row { display: flex; align-items: center; gap: 8px; }
+.pf-ref-ext {
+    font-size: 0.7rem; font-weight: 700; font-family: monospace;
+    border-radius: 5px; padding: 2px 7px; flex-shrink: 0; min-width: 38px; text-align: center;
+}
+.pf-ext-sh  { background: rgba(234,179,8,.12); color: #facc15; }
+.pf-ext-deb { background: rgba(239,68,68,.12); color: #f87171; }
+.pf-ext-rpm { background: rgba(249,115,22,.12); color: #fb923c; }
+.pf-ext-msu { background: rgba(14,165,233,.12); color: #38bdf8; }
+.pf-ext-exe { background: rgba(99,102,241,.12); color: #818cf8; }
+.pf-ext-msi { background: rgba(167,139,250,.12); color: #c4b5fd; }
+.pf-ref-cmd {
+    font-size: 0.73rem; color: #94a3b8; background: rgba(255,255,255,.05);
+    border-radius: 5px; padding: 2px 6px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Actions */
+.pf-actions {
+    display: flex; gap: 10px; justify-content: flex-end; margin-top: 0.25rem;
+}
+.pf-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0.65rem 1.4rem; border-radius: 10px; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; border: none; text-decoration: none;
+    transition: all .2s; font-family: inherit;
+}
+.pf-btn-ghost {
+    background: rgba(255,255,255,.06); color: #94a3b8;
+    border: 1px solid rgba(255,255,255,.1);
+}
+.pf-btn-ghost:hover { background: rgba(255,255,255,.1); color: #f1f5f9; }
+.pf-btn-primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; box-shadow: 0 4px 14px rgba(99,102,241,.35);
+}
+.pf-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(99,102,241,.5);
+}
+.pf-btn-primary:active { transform: none; }
+</style>
+
+<script>
+/* ── Drop zone interactions ───────────────────────────────────────────────── */
+const dropZone    = document.getElementById('dropZone');
+const patchFile   = document.getElementById('patchFile');
+const dropIcon    = document.getElementById('dropIcon');
+const dropText    = document.getElementById('dropText');
+const dropFmts    = dropZone.querySelector('.pf-drop-formats');
+const dropSelected= document.getElementById('dropSelected');
+const selName     = document.getElementById('selName');
+const selSize     = document.getElementById('selSize');
+const selIcon     = document.getElementById('selIcon');
+const selRemove   = document.getElementById('selRemove');
+
+const EXT_ICONS = {
+    sh:'fa-file-code', deb:'fa-box', rpm:'fa-box',
+    msu:'fa-file-zipper', exe:'fa-windows', msi:'fa-file-powerpoint',
+    tar:'fa-file-zipper', gz:'fa-file-zipper', tgz:'fa-file-zipper'
+};
+
+function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(2) + ' MB';
+}
+
+function showSelected(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    selIcon.className = 'fas ' + (EXT_ICONS[ext] || 'fa-file');
+    selName.textContent = file.name;
+    selSize.textContent = formatBytes(file.size);
+    dropIcon.style.display = 'none';
+    dropText.style.display = 'none';
+    if (dropFmts) dropFmts.style.display = 'none';
+    dropSelected.style.display = 'flex';
+}
+
+function clearSelected() {
+    patchFile.value = '';
+    dropIcon.style.display = '';
+    dropText.style.display = '';
+    if (dropFmts) dropFmts.style.display = '';
+    dropSelected.style.display = 'none';
+}
+
+patchFile.addEventListener('change', () => {
+    if (patchFile.files.length > 0) {
+        showSelected(patchFile.files[0]);
+        fetchSuggestion();
+    }
+});
+selRemove.addEventListener('click', () => { clearSelected(); });
+
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => {
+    ev.preventDefault(); dropZone.classList.add('drag-over');
+}));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => {
+    dropZone.classList.remove('drag-over');
+}));
+dropZone.addEventListener('drop', ev => {
+    ev.preventDefault();
+    if (ev.dataTransfer.files.length) {
+        const dt = new DataTransfer(); dt.items.add(ev.dataTransfer.files[0]);
+        patchFile.files = dt.files;
+        showSelected(ev.dataTransfer.files[0]);
+        fetchSuggestion();
+    }
+});
+
+/* ── Placeholder chip insert ──────────────────────────────────────────────── */
+const installArea = document.querySelector('textarea[name="installCommand"]');
+function insertPlaceholder(ph) {
+    const start = installArea.selectionStart, end = installArea.selectionEnd;
+    installArea.value = installArea.value.slice(0,start) + ph + installArea.value.slice(end);
+    installArea.focus();
+    installArea.selectionStart = installArea.selectionEnd = start + ph.length;
+}
+
+/* ── Smart suggestion fetch ───────────────────────────────────────────────── */
+const osTypeSelect = document.getElementById('osTypeSelect');
+const deployInput  = document.getElementById('deployPathInput');
+const suggestBanner = document.getElementById('suggest-banner');
+const suggestText   = document.getElementById('suggest-text');
+
+async function fetchSuggestion() {
+    const osType = osTypeSelect.value;
+    const file   = patchFile.files && patchFile.files.length > 0 ? patchFile.files[0] : null;
+
+    if (!deployInput.value.trim()) {
+        deployInput.placeholder = osType === 'WINDOWS' ? 'e.g. C:\\Patches\\' : 'e.g. /tmp/patches/';
+    }
+    if (!osType || !file) return;
+
+    try {
+        const url = `/api/v1/patches/suggest-command?osType=${encodeURIComponent(osType)}&filename=${encodeURIComponent(file.name)}`;
+        const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        const applied = [];
+        if (!installArea.value.trim()) { installArea.value = data.command; applied.push('<strong>Install command</strong>'); }
+        if (!deployInput.value.trim()) { deployInput.value = data.deployPath; applied.push('<strong>Deploy path</strong>'); }
+
+        const ext = file.name.substring(file.name.lastIndexOf('.'));
+        suggestText.innerHTML =
+            `Detected <code>${ext}</code> on <strong>${osType}</strong>. ` +
+            (applied.length ? `${applied.join(' &amp; ')} auto-filled — edit freely.` : `Suggestion: <code>${data.command}</code>`) +
+            `<br><small style="opacity:.7">Tip: <code>{FILE}</code> → full remote path · <code>{FILENAME}</code> → basename</small>`;
+        suggestBanner.style.display = 'flex';
+    } catch(e) { console.warn(e); }
+}
+
+osTypeSelect.addEventListener('change', fetchSuggestion);
+
+/* ── Severity badge colour on select ─────────────────────────────────────── */
+const sevSelect = document.getElementById('severitySelect');
+const SEV_COLORS = { CRITICAL:'#ef4444',HIGH:'#f97316',MEDIUM:'#f59e0b',LOW:'#22c55e',INFO:'#3b82f6' };
+sevSelect && sevSelect.addEventListener('change', function() {
+    this.style.color = SEV_COLORS[this.value] || '';
+});
+if (sevSelect && sevSelect.value) sevSelect.style.color = SEV_COLORS[sevSelect.value] || '';
+</script>
+</body>
+</html>

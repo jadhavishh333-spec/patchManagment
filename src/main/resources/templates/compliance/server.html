@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Server Compliance')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Server Compliance History')}"></div>
+    <div class="content-body">
+        <div class="page-actions">
+            <a th:href="@{/compliance}" class="btn btn-ghost"><i class="fas fa-arrow-left me-2"></i>Back</a>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-server me-2"></i>Compliance Records</h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Patch</th><th>Patch ID</th><th>Status</th><th>Compliance Date</th><th>Applied At</th><th>Verified By</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="r : ${records}" class="table-row-hover">
+                            <td th:text="${r.patchTitle}"></td>
+                            <td class="patch-id" th:text="${r.patchIdentifier}"></td>
+                            <td>
+                                <span class="status-badge"
+                                      th:classappend="${r.status.name() == 'COMPLIANT'} ? 'status-completed' : 'status-failed'"
+                                      th:text="${r.status}"></span>
+                            </td>
+                            <td th:text="${r.complianceDate}"></td>
+                            <td th:text="${r.patchAppliedAt != null ? #temporals.format(r.patchAppliedAt,'dd-MMM-yyyy HH:mm') : '—'}"></td>
+                            <td th:text="${r.verifiedBy ?: '—'}"></td>
+                            <td th:text="${r.notes ?: '—'}"></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(records)}">
+                            <td colspan="7" class="empty-state">No compliance records for this server.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

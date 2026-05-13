@@ -1,0 +1,11 @@
+package com.patchmgmt.repository;
+
+import com.patchmgmt.entity.Environment;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface EnvironmentRepository extends JpaRepository<Environment, Long> {
+    Optional<Environment> findByName(String name);
+    boolean existsByName(String name);
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Reports')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Reports & Exports')}"></div>
+    <div class="content-body">
+        <div th:replace="~{layout :: alerts}"></div>
+
+        <!-- Report Cards -->
+        <div class="report-cards">
+            <div class="report-card">
+                <div class="report-card-icon" style="background: linear-gradient(135deg,#6366f1,#8b5cf6)">
+                    <i class="fas fa-file-csv"></i>
+                </div>
+                <div class="report-card-body">
+                    <h3>Patch Job Report</h3>
+                    <p>Export all patch jobs with status, server, patch ID, severity, timing, and retry counts.</p>
+                    <div class="report-filters">
+                        <form th:action="@{/reports/export/patch-csv}" method="get" class="filter-form">
+                            <div class="form-row-compact">
+                                <select name="environment" class="form-control-sm">
+                                    <option value="">All Environments</option>
+                                    <option th:each="env : ${environments}" th:value="${env}" th:text="${env}"></option>
+                                </select>
+                                <select name="status" class="form-control-sm">
+                                    <option value="">All Statuses</option>
+                                    <option th:each="s : ${statuses}" th:value="${s}" th:text="${s}"></option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="fas fa-download me-2"></i>Download CSV
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-card">
+                <div class="report-card-icon" style="background: linear-gradient(135deg,#ef4444,#f97316)">
+                    <i class="fas fa-file-pdf"></i>
+                </div>
+                <div class="report-card-body">
+                    <h3>Compliance Report</h3>
+                    <p>Download a formatted PDF compliance report showing patch status per server and environment.</p>
+                    <div class="report-filters">
+                        <form th:action="@{/reports/export/compliance-pdf}" method="get" class="filter-form">
+                            <div class="form-row-compact">
+                                <select name="environment" class="form-control-sm">
+                                    <option value="">All Environments</option>
+                                    <option th:each="env : ${environments}" th:value="${env}" th:text="${env}"></option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-danger btn-sm">
+                                <i class="fas fa-file-pdf me-2"></i>Download PDF
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-card">
+                <div class="report-card-icon" style="background: linear-gradient(135deg,#0ea5e9,#22d3ee)">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="report-card-body">
+                    <h3>Audit Log Export</h3>
+                    <p>Export complete audit trail of all actions performed by users and the system.</p>
+                    <div class="report-filters">
+                        <a th:href="@{/reports/export/audit-csv}" class="btn btn-info btn-sm">
+                            <i class="fas fa-download me-2"></i>Download CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-card">
+                <div class="report-card-icon" style="background: linear-gradient(135deg,#22c55e,#16a34a)">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                <div class="report-card-body">
+                    <h3>Execution Log Export</h3>
+                    <p>Export job execution summaries with log snippets for all patch job runs.</p>
+                    <div class="report-filters">
+                        <form th:action="@{/reports/export/execution-csv}" method="get" class="filter-form">
+                            <div class="form-row-compact">
+                                <select name="status" class="form-control-sm">
+                                    <option value="">All Statuses</option>
+                                    <option th:each="s : ${statuses}" th:value="${s}" th:text="${s}"></option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="fas fa-download me-2"></i>Download CSV
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+/* Inter Variable Font — self-hosted, no CDN required */
+@font-face {
+    font-family: 'Inter';
+    src: url('../webfonts/InterVariable.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}

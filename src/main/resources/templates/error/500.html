@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Server Error')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div class="error-page">
+        <div class="error-code" style="color:#f97316">500</div>
+        <div class="error-title">Internal Server Error</div>
+        <div class="error-message" th:text="${errorMessage}">An unexpected error occurred.</div>
+        <details class="error-details" th:if="${errorDetail}">
+            <summary>Technical Details</summary>
+            <code th:text="${errorDetail}"></code>
+        </details>
+        <div class="error-actions">
+            <a href="/dashboard" class="btn btn-primary"><i class="fas fa-home me-2"></i>Go to Dashboard</a>
+            <a href="javascript:history.back()" class="btn btn-ghost"><i class="fas fa-arrow-left me-2"></i>Go Back</a>
+        </div>
+    </div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Compliance Dashboard')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Compliance Dashboard')}"></div>
+    <div class="content-body">
+        <div th:replace="~{layout :: alerts}"></div>
+
+        <!-- Summary KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-green">
+                <div class="kpi-icon"><i class="fas fa-circle-check"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-value" th:text="${compliance.compliantServers}">0</div>
+                    <div class="kpi-label">Compliant Servers</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-red">
+                <div class="kpi-icon"><i class="fas fa-circle-xmark"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-value" th:text="${compliance.nonCompliantServers}">0</div>
+                    <div class="kpi-label">Non-Compliant</div>
+                </div>
+            </div>
+            <div class="kpi-card kpi-gray">
+                <div class="kpi-icon"><i class="fas fa-circle-question"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-value" th:text="${compliance.unknownServers}">0</div>
+                    <div class="kpi-label">Unknown</div>
+                </div>
+            </div>
+            <div class="kpi-card" th:classappend="${compliance.overallCompliancePercentage >= 80} ? 'kpi-green' : 'kpi-red'">
+                <div class="kpi-icon"><i class="fas fa-chart-pie"></i></div>
+                <div class="kpi-data">
+                    <div class="kpi-value"
+                         th:text="${#numbers.formatDecimal(compliance.overallCompliancePercentage,1,1)} + '%'">0%</div>
+                    <div class="kpi-label">Overall Compliance</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Environment Compliance Bars -->
+        <div class="card mt-4" th:if="${compliance.complianceByEnvironment != null and !compliance.complianceByEnvironment.isEmpty()}">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-layer-group me-2"></i>Compliance by Environment</h2>
+            </div>
+            <div class="card-body">
+                <div class="compliance-env-bars">
+                    <div class="compliance-bar-row" th:each="entry : ${compliance.complianceByEnvironment}">
+                        <div class="comp-bar-label">
+                            <a th:href="@{/compliance/environment/{env}(env=${entry.key})}" class="link-primary"
+                               th:text="${entry.key}"></a>
+                        </div>
+                        <div class="comp-bar-track">
+                            <div class="comp-bar-fill"
+                                 th:classappend="${entry.value >= 80} ? 'comp-fill-good' : (${entry.value >= 50} ? 'comp-fill-warn' : 'comp-fill-bad')"
+                                 th:style="'width:' + ${entry.value} + '%'"></div>
+                        </div>
+                        <div class="comp-bar-pct" th:text="${entry.value} + '%'"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Non-Compliant Servers -->
+        <div class="card mt-4" th:if="${!#lists.isEmpty(compliance.nonCompliantServerList)}">
+            <div class="card-header">
+                <h2 class="card-title text-danger">
+                    <i class="fas fa-triangle-exclamation me-2"></i>Non-Compliant Servers
+                </h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Server</th><th>IP</th><th>Environment</th><th>Status</th><th>Last Patched</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="s : ${compliance.nonCompliantServerList}" class="table-row-hover">
+                            <td th:text="${s.serverName}"></td>
+                            <td th:text="${s.ipAddress}"></td>
+                            <td><span class="env-tag" th:text="${s.environment ?: '—'}"></span></td>
+                            <td>
+                                <span class="status-badge status-failed" th:text="${s.status}"></span>
+                            </td>
+                            <td th:text="${s.lastPatchDate}"></td>
+                            <td>
+                                <a th:href="@{/compliance/server/{id}(id=${s.serverId})}" class="btn-icon">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a th:href="@{/jobs/new}" class="btn-icon btn-icon-success" title="Create patch job">
+                                    <i class="fas fa-plus"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

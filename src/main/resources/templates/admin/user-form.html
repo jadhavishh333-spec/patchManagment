@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('New User')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('User Management')}"></div>
+    <div class="content-body">
+
+        <div class="uf-back-bar">
+            <a th:href="@{/admin/users}" class="uf-back-link">
+                <i class="fas fa-arrow-left"></i> Back to Users
+            </a>
+        </div>
+
+        <div class="uf-wrapper">
+            <div class="uf-card">
+
+                <!-- Header -->
+                <div class="uf-header">
+                    <div class="uf-header-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <div>
+                        <h1 class="uf-title">Create New User</h1>
+                        <p class="uf-subtitle">All users can immediately log in after creation.</p>
+                    </div>
+                </div>
+
+                <form th:action="@{/admin/users/new}" th:object="${user}" method="post" class="uf-form" novalidate>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <!-- Global validation error summary -->
+                    <div th:if="${#fields.hasAnyErrors()}" class="uf-error-banner" style="margin: -1.75rem -2rem 1.75rem -2rem; border-radius: 0;">
+                        <i class="fas fa-circle-exclamation"></i>
+                        <span>Please fix the errors below before creating the user.</span>
+                    </div>
+
+                    <!-- Row 1: Username + Full Name -->
+                    <div class="uf-row">
+                        <div class="uf-field" th:classappend="${#fields.hasErrors('username')} ? 'uf-field-error' : ''">
+                            <label class="uf-label" for="username">
+                                Username <span class="uf-required">*</span>
+                            </label>
+                            <div class="uf-input-wrap">
+                                <span class="uf-input-prefix"><i class="fas fa-at"></i></span>
+                                <input type="text" th:field="*{username}" id="username"
+                                       class="uf-input" placeholder="e.g. john.doe"
+                                       autocomplete="username"/>
+                            </div>
+                            <div class="uf-field-error-msg" th:if="${#fields.hasErrors('username')}"
+                                 th:errors="*{username}"></div>
+                        </div>
+                        <div class="uf-field">
+                            <label class="uf-label" for="fullName">
+                                Full Name
+                                <span class="uf-optional-tag">optional</span>
+                            </label>
+                            <div class="uf-input-wrap">
+                                <span class="uf-input-prefix"><i class="fas fa-id-card"></i></span>
+                                <input type="text" th:field="*{fullName}" id="fullName"
+                                       class="uf-input" placeholder="e.g. John Doe"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Email + Role -->
+                    <div class="uf-row">
+                        <div class="uf-field" th:classappend="${#fields.hasErrors('email')} ? 'uf-field-error' : ''">
+                            <label class="uf-label" for="email">
+                                Email
+                                <span class="uf-optional-tag">optional</span>
+                            </label>
+                            <div class="uf-input-wrap">
+                                <span class="uf-input-prefix"><i class="fas fa-envelope"></i></span>
+                                <input type="email" th:field="*{email}" id="email"
+                                       class="uf-input" placeholder="user@company.com"
+                                       autocomplete="email"/>
+                            </div>
+                            <div class="uf-field-error-msg" th:if="${#fields.hasErrors('email')}"
+                                 th:errors="*{email}"></div>
+                        </div>
+                        <div class="uf-field">
+                            <label class="uf-label" for="role">
+                                Role <span class="uf-required">*</span>
+                            </label>
+                            <div class="uf-select-wrap">
+                                <select th:field="*{role}" id="role" class="uf-input">
+                                    <option th:each="r : ${roles}"
+                                            th:value="${r}"
+                                            th:text="${r.name().replace('ROLE_','')}"></option>
+                                </select>
+                                <i class="fas fa-chevron-down uf-select-arrow"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Password -->
+                    <div class="uf-row uf-row-single">
+                        <div class="uf-field" th:classappend="${#fields.hasErrors('password')} ? 'uf-field-error' : ''">
+                            <label class="uf-label" for="password">
+                                Password <span class="uf-required">*</span>
+                            </label>
+                            <div class="uf-input-wrap" id="pwWrap">
+                                <span class="uf-input-prefix"><i class="fas fa-lock"></i></span>
+                                <input type="password" th:field="*{password}" id="password"
+                                       class="uf-input" placeholder="Min. 6 characters"
+                                       autocomplete="new-password"
+                                       oninput="updateStrength(this.value)"/>
+                                <button type="button" class="uf-pw-toggle" onclick="togglePw()" title="Show/hide password">
+                                    <i class="fas fa-eye" id="pwEyeIcon"></i>
+                                </button>
+                            </div>
+                            <div class="uf-field-error-msg" th:if="${#fields.hasErrors('password')}"
+                                 th:errors="*{password}"></div>
+                            <!-- Strength bar -->
+                            <div class="uf-strength-bar" id="strengthBar">
+                                <div class="uf-strength-fill" id="strengthFill"></div>
+                            </div>
+                            <div class="uf-strength-label" id="strengthLabel"></div>
+                        </div>
+                    </div>
+
+                    <!-- Role info pills -->
+                    <div class="uf-role-info">
+                        <div class="uf-role-pill uf-role-admin">
+                            <i class="fas fa-shield-halved"></i>
+                            <div>
+                                <strong>ADMIN</strong>
+                                <span>Full access — approve jobs, manage users, view reports</span>
+                            </div>
+                        </div>
+                        <div class="uf-role-pill uf-role-user">
+                            <i class="fas fa-user"></i>
+                            <div>
+                                <strong>USER</strong>
+                                <span>Can create &amp; execute jobs, view logs, view compliance</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="uf-actions">
+                        <a th:href="@{/admin/users}" class="uf-btn uf-btn-ghost">
+                            <i class="fas fa-xmark"></i> Cancel
+                        </a>
+                        <button type="submit" class="uf-btn uf-btn-primary">
+                            <i class="fas fa-user-plus"></i> Create User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+
+<style>
+/* ── User Form — Premium Design ──────────────────────────────────────────── */
+.uf-back-bar { margin-bottom: 1.5rem; }
+.uf-back-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--text-muted, #94a3b8); font-size: 0.875rem;
+    text-decoration: none; transition: color .2s;
+}
+.uf-back-link:hover { color: #f1f5f9; }
+
+.uf-wrapper {
+    max-width: 680px; margin: 0 auto;
+}
+
+.uf-card {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 20px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,.3);
+}
+
+.uf-header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 1.75rem 2rem 1.25rem;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(139,92,246,.05));
+}
+.uf-header-icon {
+    width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0;
+    background: linear-gradient(135deg,#6366f1,#8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; color: #fff;
+    box-shadow: 0 4px 16px rgba(99,102,241,.4);
+}
+.uf-title { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; margin: 0 0 3px; }
+.uf-subtitle { font-size: 0.8rem; color: #64748b; margin: 0; }
+
+.uf-error-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(239,68,68,.1); border-bottom: 1px solid rgba(239,68,68,.2);
+    padding: 0.9rem 2rem; color: #fca5a5; font-size: 0.875rem;
+}
+.uf-error-banner i { color: #f87171; }
+
+.uf-form { padding: 1.75rem 2rem; }
+
+.uf-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1.25rem; margin-bottom: 1.25rem;
+}
+.uf-row-single { grid-template-columns: 1fr; }
+@media (max-width: 600px) { .uf-row { grid-template-columns: 1fr; } }
+
+.uf-field { display: flex; flex-direction: column; gap: 6px; }
+.uf-field-error .uf-input-wrap { border-color: rgba(239,68,68,.5) !important; }
+.uf-field-error .uf-input-prefix { color: #f87171 !important; }
+
+.uf-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.825rem; font-weight: 500; color: #94a3b8;
+}
+.uf-required { color: #f87171; }
+.uf-optional-tag {
+    font-size: 0.7rem; font-weight: 400;
+    background: rgba(100,116,139,.15); color: #64748b;
+    border-radius: 4px; padding: 1px 6px;
+}
+
+.uf-input-wrap {
+    display: flex; align-items: center;
+    background: rgba(15,23,42,.6);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 10px;
+    overflow: hidden; transition: border-color .2s, box-shadow .2s;
+}
+.uf-input-wrap:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,.2);
+}
+.uf-input-prefix {
+    padding: 0 0.85rem; color: #475569; font-size: 0.9rem;
+    border-right: 1px solid rgba(255,255,255,.06); flex-shrink: 0;
+    display: flex; align-items: center; height: 100%; min-height: 42px;
+}
+.uf-input {
+    flex: 1; border: none; background: transparent; outline: none;
+    color: #f1f5f9; padding: 0.65rem 0.9rem;
+    font-size: 0.9rem; font-family: inherit; width: 100%;
+}
+.uf-input::placeholder { color: #334155; }
+
+.uf-select-wrap { position: relative; }
+.uf-select-wrap select { appearance: none; width: 100%; }
+.uf-select-wrap select option { background-color: #1e293b; color: #f1f5f9; }
+.uf-select-arrow {
+    position: absolute; right: 12px; top: 50%;
+    transform: translateY(-50%); color: #475569;
+    font-size: 0.75rem; pointer-events: none;
+}
+
+.uf-pw-toggle {
+    background: none; border: none; color: #475569; cursor: pointer;
+    padding: 0 12px; font-size: 0.9rem; transition: color .2s;
+}
+.uf-pw-toggle:hover { color: #94a3b8; }
+
+.uf-field-error-msg {
+    font-size: 0.78rem; color: #f87171;
+    display: flex; align-items: center; gap: 5px;
+}
+.uf-field-error-msg::before {
+    content: '\f06a'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+    font-size: 0.7rem;
+}
+
+/* Password strength */
+.uf-strength-bar {
+    height: 4px; border-radius: 2px; background: rgba(255,255,255,.08);
+    margin-top: 6px; overflow: hidden;
+}
+.uf-strength-fill {
+    height: 100%; width: 0%; border-radius: 2px;
+    transition: width .3s, background .3s;
+}
+.uf-strength-label {
+    font-size: 0.72rem; color: #64748b; margin-top: 3px; height: 14px;
+}
+
+/* Role info pills */
+.uf-role-info {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 1.75rem;
+}
+@media (max-width: 600px) { .uf-role-info { grid-template-columns: 1fr; } }
+
+.uf-role-pill {
+    display: flex; align-items: flex-start; gap: 10px;
+    border-radius: 10px; padding: 10px 12px; font-size: 0.78rem;
+}
+.uf-role-pill i { font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+.uf-role-pill strong { display: block; font-size: 0.8rem; margin-bottom: 1px; }
+.uf-role-pill span { color: #64748b; line-height: 1.4; }
+
+.uf-role-admin {
+    background: rgba(99,102,241,.08);
+    border: 1px solid rgba(99,102,241,.15);
+    color: #818cf8;
+}
+.uf-role-admin strong { color: #a5b4fc; }
+
+.uf-role-user {
+    background: rgba(20,184,166,.07);
+    border: 1px solid rgba(20,184,166,.15);
+    color: #2dd4bf;
+}
+.uf-role-user strong { color: #5eead4; }
+
+/* Actions */
+.uf-actions {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 10px; padding-top: 1rem;
+    border-top: 1px solid rgba(255,255,255,.06);
+}
+.uf-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0.65rem 1.4rem; border-radius: 10px; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; border: none;
+    text-decoration: none; transition: all .2s; font-family: inherit;
+}
+.uf-btn-ghost {
+    background: rgba(255,255,255,.06); color: #94a3b8;
+    border: 1px solid rgba(255,255,255,.1);
+}
+.uf-btn-ghost:hover { background: rgba(255,255,255,.1); color: #f1f5f9; }
+.uf-btn-primary {
+    background: linear-gradient(135deg,#6366f1,#8b5cf6);
+    color: #fff; box-shadow: 0 4px 14px rgba(99,102,241,.35);
+}
+.uf-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(99,102,241,.5);
+}
+</style>
+
+<script>
+/* Password show/hide */
+function togglePw() {
+    const inp = document.getElementById('password');
+    const ico = document.getElementById('pwEyeIcon');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        ico.className = 'fas fa-eye-slash';
+    } else {
+        inp.type = 'password';
+        ico.className = 'fas fa-eye';
+    }
+}
+
+/* Password strength */
+function updateStrength(val) {
+    const fill  = document.getElementById('strengthFill');
+    const label = document.getElementById('strengthLabel');
+    if (!fill) return;
+
+    let score = 0;
+    if (val.length >= 6)  score++;
+    if (val.length >= 10) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const levels = [
+        { pct: '0%',   color: '',        text: '' },
+        { pct: '25%',  color: '#ef4444', text: 'Weak' },
+        { pct: '50%',  color: '#f97316', text: 'Fair' },
+        { pct: '75%',  color: '#f59e0b', text: 'Good' },
+        { pct: '90%',  color: '#22c55e', text: 'Strong' },
+        { pct: '100%', color: '#10b981', text: 'Very strong' },
+    ];
+    const lvl = levels[Math.min(score, 5)];
+    fill.style.width = val.length ? lvl.pct : '0%';
+    fill.style.background = lvl.color;
+    label.textContent = val.length ? lvl.text : '';
+    label.style.color = lvl.color;
+}
+
+/* Highlight role pill based on selection */
+const roleSelect = document.getElementById('role');
+function highlightRole() {
+    document.querySelectorAll('.uf-role-pill').forEach(p => p.style.opacity = '0.4');
+    const val = roleSelect.value;
+    if (val.includes('ADMIN')) document.querySelector('.uf-role-admin').style.opacity = '1';
+    else document.querySelector('.uf-role-user').style.opacity = '1';
+}
+roleSelect && roleSelect.addEventListener('change', highlightRole);
+highlightRole();
+</script>
+</body>
+</html>

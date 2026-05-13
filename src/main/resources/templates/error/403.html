@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Access Denied')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div class="error-page">
+        <div class="error-code" style="color:#ef4444">403</div>
+        <div class="error-title">Access Denied</div>
+        <div class="error-message" th:text="${errorMessage}">You do not have permission to access this resource.</div>
+        <div class="error-actions">
+            <a href="/dashboard" class="btn btn-primary"><i class="fas fa-home me-2"></i>Go to Dashboard</a>
+        </div>
+    </div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Execution Logs')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Execution Logs')}"></div>
+    <div class="content-body">
+        <div class="page-actions">
+            <a th:href="@{/jobs/{id}(id=${job.id})}" class="btn btn-ghost">
+                <i class="fas fa-arrow-left me-2"></i>Back to Job
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-terminal me-2"></i>
+                    Execution Log — <span th:text="${job.title}"></span>
+                    <span class="status-badge ms-2"
+                          th:classappend="'status-' + ${job.status.name().toLowerCase().replace('_','-')}"
+                          th:text="${job.status}"></span>
+                </h2>
+            </div>
+            <div class="card-body p-0">
+                <div class="log-terminal log-terminal-full" id="masterLog">
+                    <div class="log-toolbar">
+                        <span class="log-info">
+                            Job #<span th:text="${job.id}"></span> |
+                            Server: <span th:text="${job.server.name}"></span> |
+                            Patch: <span th:text="${job.patch.patchId}"></span>
+                        </span>
+                        <button class="btn-icon" onclick="copyLog()" title="Copy log">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <pre id="logContent" th:text="${job.executionLog != null ? job.executionLog : 'No log output yet.'}"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Per-server execution logs -->
+        <div class="card mt-4" th:if="${!#lists.isEmpty(execLogs)}">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-server me-2"></i>Per-Server Execution Details</h2>
+            </div>
+            <div class="card-body">
+                <div class="exec-log-item" th:each="el : ${execLogs}">
+                    <div class="exec-log-header">
+                        <div class="exec-log-server">
+                            <i class="fas fa-server me-2"></i>
+                            <span th:text="${el.server.name}"></span>
+                            <small class="text-muted ms-2" th:text="'(' + ${el.server.ipAddress} + ')'"></small>
+                        </div>
+                        <div class="exec-log-meta">
+                            <span class="status-badge"
+                                  th:classappend="'status-' + ${el.status.name().toLowerCase().replace('_','-')}"
+                                  th:text="${el.status}"></span>
+                            <span th:if="${el.retryAttempt > 0}" class="retry-badge ms-2"
+                                  th:text="'Retry #' + ${el.retryAttempt}"></span>
+                            <span class="text-muted ms-3" th:if="${el.startedAt}"
+                                  th:text="${#temporals.format(el.startedAt,'HH:mm:ss')} + ' → ' + (${el.completedAt != null ? #temporals.format(el.completedAt,'HH:mm:ss') : 'running...'})"></span>
+                        </div>
+                    </div>
+                    <div class="exec-log-body">
+                        <pre th:text="${el.logOutput != null ? el.logOutput : el.errorMessage ?: 'No output captured.'}"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+<script>
+function copyLog() {
+    const text = document.getElementById('logContent').textContent;
+    navigator.clipboard.writeText(text).then(() => showToast('Log copied to clipboard!'));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Server Form')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Server')}" ></div>
+    <div class="content-body">
+        <div class="page-actions">
+            <a th:href="@{/servers}" class="btn btn-ghost"><i class="fas fa-arrow-left me-2"></i>Back</a>
+        </div>
+        <div class="card form-card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-server me-2"></i>
+                    <span th:text="${server.id != null} ? 'Edit Server' : 'Register New Server'"></span>
+                </h2>
+            </div>
+            <div class="card-body">
+                <form th:action="${server.id != null} ? @{/servers/{id}/edit(id=${server.id})} : @{/servers/new}"
+                      th:object="${server}" method="post" class="enterprise-form">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Server Name <span class="required">*</span></label>
+                            <input type="text" th:field="*{name}" class="form-control"
+                                   placeholder="e.g. WEB-PROD-01"/>
+                            <div class="form-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">IP Address / Hostname <span class="required">*</span></label>
+                            <input type="text" th:field="*{ipAddress}" class="form-control"
+                                   placeholder="e.g. 192.168.1.10"/>
+                            <div class="form-error" th:if="${#fields.hasErrors('ipAddress')}" th:errors="*{ipAddress}"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">OS Type <span class="required">*</span></label>
+                            <select th:field="*{osType}" class="form-control">
+                                <option value="">Select OS…</option>
+                                <option th:each="os : ${osTypes}" th:value="${os}" th:text="${os}"></option>
+                            </select>
+                            <div class="form-error" th:if="${#fields.hasErrors('osType')}" th:errors="*{osType}"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">OS Version</label>
+                            <input type="text" th:field="*{osVersion}" class="form-control"
+                                   placeholder="e.g. Windows Server 2022 / Ubuntu 22.04"/>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Environment</label>
+                            <input type="text" th:field="*{environment}" class="form-control"
+                                   placeholder="PROD / DEV / STAGING / UAT"/>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Business Unit</label>
+                            <input type="text" th:field="*{businessUnit}" class="form-control"
+                                   placeholder="e.g. Core Banking / Engineering"/>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">WinRM Port (Windows)</label>
+                            <input type="number" th:field="*{winrmPort}" class="form-control" value="5985"/>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">SSH Port (Linux)</label>
+                            <input type="number" th:field="*{sshPort}" class="form-control" value="22"/>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Execution Strategy</label>
+                            <select th:field="*{executionStrategy}" class="form-control">
+                                <option th:each="e : ${strategies}" th:value="${e}" th:text="${e}"></option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">CyberArk Safe</label>
+                            <input type="text" th:field="*{cyberArkSafe}" class="form-control"
+                                   placeholder="e.g. PatchMgmtSafe"/>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea th:field="*{description}" class="form-control" rows="2"
+                                  placeholder="Optional server description"></textarea>
+                    </div>
+
+                    <!-- Pre-Patch Service Lifecycle -->
+                    <div class="card" style="margin-top:1.5rem;border:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.04);border-radius:12px;padding:1.25rem 1.5rem;">
+                        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;">
+                            <i class="fas fa-right-left" style="color:#6366f1;font-size:1rem;"></i>
+                            <strong style="color:#f1f5f9;font-size:.95rem;">Pre/Post Patch Service Management</strong>
+                            <span style="font-size:.78rem;color:#64748b;margin-left:.25rem;">(optional)</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                Services to Stop Before Patch
+                                <span style="font-size:.78rem;font-weight:400;color:#64748b;" id="serviceHint">
+                                    &mdash; comma-separated names
+                                </span>
+                            </label>
+                            <textarea th:field="*{preStopServices}" class="form-control" rows="2"
+                                      id="preStopServicesInput"
+                                      placeholder="e.g. nginx, tomcat9, myapp (Linux) | DefaultAppPool, MyAPI (Windows)"></textarea>
+                            <small style="color:#64748b;display:block;margin-top:.4rem;">
+                                These services are stopped before patching and automatically restarted after
+                                (with 3 retry attempts on failure).
+                            </small>
+                        </div>
+                        <div class="form-group" id="iisModeGroup" style="display:none;">
+                            <label class="form-label">IIS Stop Mode <span style="color:#64748b;font-weight:400;">(Windows only)</span></label>
+                            <select th:field="*{iisStopMode}" class="form-control">
+                                <option value="APPPOOL">App Pool only (recommended)</option>
+                                <option value="SITE">IIS Site only</option>
+                                <option value="BOTH">Both &mdash; Site + App Pool</option>
+                            </select>
+                            <small style="color:#64748b;display:block;margin-top:.4rem;">
+                                Controls whether the names above refer to App Pools, Sites, or both.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <a th:href="@{/servers}" class="btn btn-ghost">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Server
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+<script>
+(function() {
+    var osSelect = document.querySelector('select[id$="osType"], select[name="osType"]');
+    var iisModeGroup = document.getElementById('iisModeGroup');
+    var hintEl = document.getElementById('serviceHint');
+    var textareaEl = document.getElementById('preStopServicesInput');
+    if (!osSelect || !iisModeGroup) return;
+
+    function updateServiceUI() {
+        var isWindows = osSelect.value === 'WINDOWS';
+        iisModeGroup.style.display = isWindows ? 'block' : 'none';
+        if (textareaEl) {
+            textareaEl.placeholder = isWindows
+                ? 'e.g. DefaultAppPool, MyAPI, ReportingPool'
+                : 'e.g. nginx, tomcat9, myapp, postgresql';
+        }
+        if (hintEl) {
+            hintEl.textContent = isWindows
+                ? '\u2014 IIS App Pool or Site names, comma-separated'
+                : '\u2014 systemd service names, comma-separated';
+        }
+    }
+
+    osSelect.addEventListener('change', updateServiceUI);
+    updateServiceUI(); // run on load for edit mode
+})();
+</script>
+</body>
+</html>

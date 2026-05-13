@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{layout :: head('Servers')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Servers')}"></div>
+    <div class="content-body">
+        <div th:replace="~{layout :: alerts}"></div>
+
+        <div class="page-actions">
+            <a th:href="@{/servers/new}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Add Server
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-server me-2"></i>Server Inventory</h2>
+                <span class="text-muted" th:text="${#lists.size(servers)} + ' total'"></span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="data-table" id="serversTable">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Name</th><th>IP / Hostname</th><th>OS</th>
+                                <th>Environment</th><th>Compliance</th><th>Last Patched</th>
+                                <th>Status</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="s : ${servers}" class="table-row-hover">
+                                <td th:text="${s.id}"></td>
+                                <td>
+                                    <a th:href="@{/servers/{id}(id=${s.id})}" class="link-primary fw-600"
+                                       th:text="${s.name}"></a>
+                                    <small class="text-muted d-block" th:if="${s.businessUnit}"
+                                           th:text="${s.businessUnit}"></small>
+                                </td>
+                                <td>
+                                    <span class="patch-id" th:text="${s.ipAddress}"></span>
+                                    <small class="text-muted d-block" th:if="${s.osVersion}" th:text="${s.osVersion}"></small>
+                                </td>
+                                <td>
+                                    <span th:if="${s.osType.name() == 'WINDOWS'}" class="os-badge os-win">
+                                        <i class="fab fa-windows me-1"></i>Windows</span>
+                                    <span th:if="${s.osType.name() == 'LINUX'}" class="os-badge os-linux">
+                                        <i class="fab fa-linux me-1"></i>Linux</span>
+                                </td>
+                                <td>
+                                    <span class="env-tag" th:if="${s.environment}" th:text="${s.environment}"></span>
+                                    <span th:unless="${s.environment}" class="text-muted">—</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge"
+                                          th:classappend="${s.complianceStatus != null and s.complianceStatus.name() == 'COMPLIANT'} ? 'status-completed' :
+                                                          (${s.complianceStatus != null and s.complianceStatus.name() == 'NON_COMPLIANT'} ? 'status-failed' : 'status-cancelled')"
+                                          th:text="${s.complianceStatus ?: 'UNKNOWN'}"></span>
+                                </td>
+                                <td>
+                                    <small th:if="${s.lastPatchDate}"
+                                           th:text="${#temporals.format(s.lastPatchDate,'dd-MMM-yyyy HH:mm')}"></small>
+                                    <small th:unless="${s.lastPatchDate}" class="text-muted">Never</small>
+                                </td>
+                                <td>
+                                    <span th:if="${s.approvalStatus != null and s.approvalStatus.name() == 'PENDING'}" class="status-badge" style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.2);">Pending Review</span>
+                                    <span th:if="${(s.approvalStatus == null or s.approvalStatus.name() == 'APPROVED') and s.active}" class="status-badge status-completed">Active</span>
+                                    <span th:if="${(s.approvalStatus == null or s.approvalStatus.name() == 'APPROVED') and !s.active}" class="status-badge status-cancelled">Inactive</span>
+                                </td>
+                                <td class="action-cell">
+                                    <a th:href="@{/servers/{id}(id=${s.id})}" class="btn-icon" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a th:href="@{/servers/{id}/edit(id=${s.id})}" class="btn-icon" title="Edit"
+                                       sec:authorize="hasRole('ADMIN')">
+                                        <i class="fas fa-pen"></i>
+                                    </a>
+                                    <form th:action="@{/servers/{id}/toggle(id=${s.id})}" method="post" class="d-inline"
+                                          sec:authorize="hasRole('ADMIN')">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn-icon" th:title="${s.active} ? 'Disable' : 'Enable'">
+                                            <i class="fas" th:classappend="${s.active} ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+                                        </button>
+                                    </form>
+                                    <a th:if="${s.approvalStatus == null or s.approvalStatus.name() == 'APPROVED'}" th:href="@{/jobs/new(serverId=${s.id})}" class="btn-icon btn-icon-success"
+                                       title="Create patch job for this server">
+                                        <i class="fas fa-plus"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(servers)}">
+                                <td colspan="9" class="empty-state">
+                                    <i class="fas fa-server fa-2x mb-2"></i><br/>
+                                    No servers registered. <a th:href="@{/servers/new}">Add one now</a>.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

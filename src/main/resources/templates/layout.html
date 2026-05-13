@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content="Enterprise Patch Orchestration Platform"/>
+    <title th:text="${title} + ' | PatchOrchestrator'">PatchOrchestrator</title>
+    <!-- Local fonts & icons — no CDN required -->
+    <link th:href="@{/css/inter.css}" rel="stylesheet"/>
+    <link th:href="@{/css/all.min.css}" rel="stylesheet"/>
+    <link th:href="@{/css/style.css}" rel="stylesheet"/>
+    <link th:href="@{/css/approvals.css}" rel="stylesheet"/>
+</head>
+
+<body>
+
+<!-- ── Demo Mode Banner ────────────────────────────────────────────────── -->
+<div th:fragment="demo-banner" th:if="${demoMode}" class="demo-banner">
+    <i class="fas fa-flask me-2"></i>
+    <strong>DEMO MODE ACTIVE</strong> — All integrations are mocked. No real WinRM/SSH/CyberArk calls are made.
+    Set <code>integration.demo-mode=false</code> in <code>application.yml</code> to enable production mode.
+</div>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<nav th:fragment="sidebar" class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="brand-text">
+            <span class="brand-name">PatchOrchestrator</span>
+            <span class="brand-version" th:text="'v' + ${appVersion}">v2.0</span>
+        </div>
+    </div>
+
+    <div class="sidebar-nav">
+        <div class="nav-section-label">Main</div>
+        <a th:href="@{/dashboard}" class="nav-item" th:classappend="${requestURI == '/dashboard'} ? 'active'">
+            <i class="fas fa-chart-pie nav-icon"></i>
+            <span>Dashboard</span>
+        </a>
+        <a th:href="@{/servers}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/servers')} ? 'active'">
+            <i class="fas fa-server nav-icon"></i>
+            <span>Servers</span>
+        </a>
+        <a th:href="@{/patches}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/patches')} ? 'active'">
+            <i class="fas fa-shield-virus nav-icon"></i>
+            <span>Patches</span>
+        </a>
+        <a th:href="@{/jobs}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/jobs')} ? 'active'">
+            <i class="fas fa-list-check nav-icon"></i>
+            <span>Patch Jobs</span>
+        </a>
+
+        <div class="nav-section-label">Operations</div>
+        <a th:href="@{/compliance}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/compliance')} ? 'active'">
+            <i class="fas fa-circle-check nav-icon"></i>
+            <span>Compliance</span>
+        </a>
+        <a th:href="@{/maintenance}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/maintenance')} ? 'active'"
+           sec:authorize="hasRole('ADMIN')">
+            <i class="fas fa-calendar-days nav-icon"></i>
+            <span>Maintenance</span>
+        </a>
+        <a th:href="@{/reports}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/reports')} ? 'active'"
+           sec:authorize="hasRole('ADMIN')">
+            <i class="fas fa-chart-bar nav-icon"></i>
+            <span>Reports</span>
+        </a>
+
+        <div class="nav-section-label" sec:authorize="hasRole('ADMIN')">Admin</div>
+        <a th:href="@{/admin/approvals}" class="nav-item" th:classappend="${requestURI == '/admin/approvals'} ? 'active'"
+           sec:authorize="hasRole('ADMIN')" style="position:relative;">
+            <i class="fas fa-clipboard-check nav-icon"></i>
+            <span>Approvals</span>
+            <span th:if="${pendingApprovalCount > 0}"
+                  th:text="${pendingApprovalCount}"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         background:#ef4444;color:#fff;font-size:0.65rem;font-weight:700;
+                         border-radius:9999px;min-width:18px;height:18px;line-height:18px;
+                         text-align:center;padding:0 4px;"></span>
+        </a>
+        <a th:href="@{/admin/users}" class="nav-item" th:classappend="${requestURI == '/admin/users'} ? 'active'"
+           sec:authorize="hasRole('ADMIN')">
+            <i class="fas fa-users nav-icon"></i>
+            <span>Users</span>
+        </a>
+        <a th:href="@{/admin/credentials}" class="nav-item" th:classappend="${#strings.startsWith(requestURI,'/admin/credentials')} ? 'active'"
+           sec:authorize="hasRole('ADMIN')">
+            <i class="fas fa-key nav-icon"></i>
+            <span>Credentials</span>
+        </a>
+        <a th:href="@{/admin/audit-logs}" class="nav-item" th:classappend="${requestURI == '/admin/audit-logs'} ? 'active'"
+           sec:authorize="hasRole('ADMIN')">
+            <i class="fas fa-clipboard-list nav-icon"></i>
+            <span>Audit Logs</span>
+        </a>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="user-details">
+                <span class="user-name" sec:authentication="name">User</span>
+                <span class="user-role badge-admin" sec:authorize="hasRole('ADMIN')">Admin</span>
+                <span class="user-role badge-user" sec:authorize="hasRole('USER')">User</span>
+            </div>
+        </div>
+        <form th:action="@{/auth/logout}" method="post" class="logout-form">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="logout-btn" title="Logout">
+                <i class="fas fa-right-from-bracket"></i>
+            </button>
+        </form>
+    </div>
+</nav>
+
+<!-- ── Topbar ──────────────────────────────────────────────────────────── -->
+<header th:fragment="topbar(pageTitle)" class="topbar">
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+    <div class="page-title">
+        <h1 th:text="${pageTitle}">Page</h1>
+    </div>
+    <div class="topbar-actions">
+        <a th:href="@{/jobs/new}" class="btn-new-job" title="New Patch Job">
+            <i class="fas fa-plus"></i>
+        </a>
+        <div class="topbar-time" id="topbarTime"></div>
+    </div>
+</header>
+
+<!-- ── Alerts ─────────────────────────────────────────────────────────── -->
+<div th:fragment="alerts">
+    <div th:if="${success}" class="alert alert-success" role="alert">
+        <i class="fas fa-circle-check me-2"></i>
+        <span th:text="${success}"></span>
+        <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger" role="alert">
+        <i class="fas fa-circle-exclamation me-2"></i>
+        <span th:text="${error}"></span>
+        <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div th:if="${info}" class="alert alert-info" role="alert">
+        <i class="fas fa-circle-info me-2"></i>
+        <span th:text="${info}"></span>
+        <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-xmark"></i></button>
+    </div>
+</div>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<footer th:fragment="footer" class="page-footer">
+    <small>&copy; 2026 PatchOrchestrator &mdash; Enterprise Patch Management Platform</small>
+</footer>
+
+<!-- ── Scripts ────────────────────────────────────────────────────────── -->
+<div th:fragment="scripts">
+    <!-- Local Chart.js — no CDN required -->
+    <script th:src="@{/js/chart.umd.min.js}"></script>
+    <script th:src="@{/js/app.js}"></script>
+</div>
+
+</body>
+</html>

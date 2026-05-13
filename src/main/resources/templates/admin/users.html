@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('User Management')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('User Management')}"></div>
+    <div class="content-body">
+        <div th:replace="~{layout :: alerts}"></div>
+        <div class="page-actions">
+            <a th:href="@{/admin/users/new}" class="btn btn-primary">
+                <i class="fas fa-user-plus me-2"></i>New User
+            </a>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-users me-2"></i>System Users</h2>
+                <span class="text-muted" th:text="${#lists.size(users)} + ' total'"></span>
+            </div>
+            <div class="card-body p-0">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>#</th><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="u : ${users}" class="table-row-hover">
+                            <td th:text="${u.id}"></td>
+                            <td>
+                                <i class="fas fa-user-circle me-2" style="color:var(--text-muted)"></i>
+                                <span class="fw-600" th:text="${u.username}"></span>
+                            </td>
+                            <td th:text="${u.fullName ?: '—'}"></td>
+                            <td th:text="${u.email ?: '—'}"></td>
+                            <td>
+                                <span class="user-role"
+                                      th:classappend="${u.role.name() == 'ROLE_ADMIN'} ? 'badge-admin' : 'badge-user'"
+                                      th:text="${u.role}"></span>
+                            </td>
+                            <td>
+                                <span th:if="${u.enabled}" class="status-badge status-completed">Active</span>
+                                <span th:unless="${u.enabled}" class="status-badge status-cancelled">Disabled</span>
+                            </td>
+                            <td class="action-cell">
+                                <form th:action="@{/admin/users/{id}/toggle(id=${u.id})}" method="post" class="d-inline">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn-icon btn-icon-warn"
+                                            th:title="${u.enabled} ? 'Disable' : 'Enable'">
+                                        <i class="fas" th:classappend="${u.enabled} ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+                                    </button>
+                                </form>
+                                <form th:action="@{/admin/users/{id}/delete(id=${u.id})}" method="post" class="d-inline">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn-icon btn-icon-danger"
+                                            onclick="return confirm('Delete this user?')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(users)}">
+                            <td colspan="7" class="empty-state">No users found.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

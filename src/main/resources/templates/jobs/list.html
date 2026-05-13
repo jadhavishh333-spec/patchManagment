@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{layout :: head('Patch Jobs')}"></head>
+<body class="app-layout">
+<div th:replace="~{layout :: demo-banner}"></div>
+<div th:replace="~{layout :: sidebar}"></div>
+<main class="main-content">
+    <div th:replace="~{layout :: topbar('Patch Jobs')}"></div>
+    <div class="content-body">
+        <div th:replace="~{layout :: alerts}"></div>
+
+        <!-- Header actions -->
+        <div class="page-actions">
+            <a th:href="@{/jobs/new}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Patch Job
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-list-check me-2"></i>All Patch Jobs</h2>
+                <div class="status-filter-bar">
+                    <a href="?" class="filter-chip"
+                       th:classappend="${activeStatus == null or activeStatus == ''} ? 'active' : ''">All</a>
+                    <a th:href="@{/jobs(status=PENDING)}" class="filter-chip status-pending"
+                       th:classappend="${activeStatus == 'PENDING'} ? 'active' : ''">Pending</a>
+                    <a th:href="@{/jobs(status=APPROVED)}" class="filter-chip status-approved"
+                       th:classappend="${activeStatus == 'APPROVED'} ? 'active' : ''">Approved</a>
+                    <a th:href="@{/jobs(status=IN_PROGRESS)}" class="filter-chip status-in_progress"
+                       th:classappend="${activeStatus == 'IN_PROGRESS'} ? 'active' : ''">In Progress</a>
+                    <a th:href="@{/jobs(status=COMPLETED)}" class="filter-chip status-completed"
+                       th:classappend="${activeStatus == 'COMPLETED'} ? 'active' : ''">Completed</a>
+                    <a th:href="@{/jobs(status=FAILED)}" class="filter-chip status-failed"
+                       th:classappend="${activeStatus == 'FAILED'} ? 'active' : ''">Failed</a>
+                    <a th:href="@{/jobs(status=CANCELLED)}" class="filter-chip status-cancelled"
+                       th:classappend="${activeStatus == 'CANCELLED'} ? 'active' : ''">Cancelled</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="data-table" id="jobsTable">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Title</th><th>Server</th><th>OS</th>
+                                <th>Patch / Severity</th><th>Status</th>
+                                <th>Retry</th><th>Scheduled</th><th>Created By</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="job : ${jobs}" class="table-row-hover">
+                                <td th:text="${job.id}"></td>
+                                <td>
+                                    <a th:href="@{/jobs/{id}(id=${job.id})}" class="link-primary fw-600"
+                                       th:text="${job.title}"></a>
+                                </td>
+                                <td>
+                                    <span th:text="${job.server.name}" class="fw-500"></span>
+                                    <small class="text-muted d-block" th:text="${job.server.ipAddress}"></small>
+                                    <span class="env-tag" th:if="${job.server.environment}" th:text="${job.server.environment}"></span>
+                                </td>
+                                <td>
+                                    <span th:if="${job.server.osType.name() == 'WINDOWS'}" class="os-badge os-win">
+                                        <i class="fab fa-windows me-1"></i>Windows</span>
+                                    <span th:if="${job.server.osType.name() == 'LINUX'}" class="os-badge os-linux">
+                                        <i class="fab fa-linux me-1"></i>Linux</span>
+                                </td>
+                                <td>
+                                    <span th:text="${job.patch.patchId}" class="patch-id"></span>
+                                    <span class="severity-badge"
+                                          th:classappend="'sev-' + ${job.patch.severity.name().toLowerCase()}"
+                                          th:text="${job.patch.severity}"></span>
+                                </td>
+                                <td>
+                                    <span class="status-badge"
+                                          th:classappend="'status-' + ${job.status.name().toLowerCase().replace('_','-')}"
+                                          th:text="${job.status}"></span>
+                                </td>
+                                <td>
+                                    <span th:if="${job.retryCount > 0}" class="retry-badge"
+                                          th:text="${job.retryCount} + '/' + ${job.maxRetries}"></span>
+                                    <span th:if="${job.retryCount == 0}" class="text-muted">—</span>
+                                </td>
+                                <td>
+                                    <small th:if="${job.scheduledAt}"
+                                           th:text="${#temporals.format(job.scheduledAt,'dd-MMM HH:mm')}"></small>
+                                    <small th:unless="${job.scheduledAt}" class="text-muted">—</small>
+                                </td>
+                                <td th:text="${job.createdBy != null ? job.createdBy.username : '—'}"></td>
+                                <td class="action-cell">
+                                    <a th:href="@{/jobs/{id}(id=${job.id})}" class="btn-icon" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <form th:if="${job.status.name() == 'PENDING'}"
+                                          th:action="@{/jobs/{id}/approve(id=${job.id})}" method="post" class="d-inline"
+                                          sec:authorize="hasRole('ADMIN')">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn-icon btn-icon-success" title="Approve"
+                                                onclick="return confirm('Approve this job?')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    <form th:if="${job.status.name() == 'FAILED' and job.retryCount < job.maxRetries}"
+                                          th:action="@{/jobs/{id}/retry(id=${job.id})}" method="post" class="d-inline"
+                                          sec:authorize="hasRole('ADMIN')">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn-icon btn-icon-warn" title="Retry">
+                                            <i class="fas fa-rotate-right"></i>
+                                        </button>
+                                    </form>
+                                    <!-- ADMIN ONLY: Delete (blocked if IN_PROGRESS) -->
+                                    <form th:if="${job.status.name() != 'IN_PROGRESS'}"
+                                          th:action="@{/jobs/{id}/delete(id=${job.id})}" method="post" class="d-inline"
+                                          sec:authorize="hasRole('ADMIN')">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn-icon btn-icon-danger" title="Delete"
+                                                th:onclick="|return confirm('Permanently delete job #${job.id}?')|">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(jobs)}">
+                                <td colspan="10" class="empty-state">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i><br/>
+                                    No patch jobs found. <a th:href="@{/jobs/new}">Create one now</a>.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:replace="~{layout :: footer}"></div>
+</main>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

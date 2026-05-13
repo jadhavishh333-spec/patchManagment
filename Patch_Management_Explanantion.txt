@@ -1,0 +1,287 @@
+PatchOrchestrator — Application Overview & Real-Server Integration Guide
+1. What Does It Do?
+PatchOrchestrator is an enterprise-grade, centralized OS patch management platform built with Spring Boot 3.2 / Java 21.
+It lets your IT/infra team:
+
+Capability	Detail
+Manage Servers	Register Windows & Linux servers with IP, OS type, environment
+Manage Patches	Define patches (Windows KB / Linux package) with severity, reboot flag
+Create Patch Jobs	Assign a patch to a server, schedule execution time
+Approval Workflow	Jobs must be approved by Admin before they can run
+Execute Patches Remotely	Connects to live servers via WinRM (Windows) or SSH (Linux)
+Credential Security	Pulls passwords from CyberArk PAM at runtime — never stored in DB
+Maintenance Windows	Jobs are gated — if you're outside the allowed window, they are blocked
+Compliance Tracking	After each job, records COMPLIANT / NON_COMPLIANT per server
+Audit Log	Every action (create, approve, execute, fail) is immutably logged
+Reporting	CSV & PDF exports for jobs, compliance, audit, execution logs
+RBAC	Admin (full) / User (create + view) roles via Spring Security
+REST API	External tools can list jobs, trigger execution, query compliance
+2. Architecture
+┌─────────────────────────────────────────────────────────────┐
+│                    Browser / UI Layer                        │
+│  Thymeleaf Templates · Dark Glassmorphism CSS · Chart.js    │
+└───────────────────────────┬─────────────────────────────────┘
+                            │  HTTP (port 8080)
+┌───────────────────────────▼─────────────────────────────────┐
+│              Spring MVC Controllers (13 classes)             │
+│  Dashboard · Jobs · Servers · Patches · Compliance          │
+│  Maintenance · Reports · Admin · Auth · REST API            │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────┐
+│                 Service Layer (11 services)                  │
+│  PatchJobService · ComplianceService · ReportService        │
+│  MaintenanceWindowService · CredentialMappingService        │
+└──────┬────────────────────┬───────────────────┬─────────────┘
+       │                    │                   │
+┌──────▼──────┐  ┌──────────▼──────────┐  ┌────▼────────────────┐
+│ Credential  │  │  Execution Engine   │  │  JPA / PostgreSQL   │
+│  Provider   │  │                     │  │                     │
+│ ─────────── │  │ WinRmStrategy       │  │  10 Repositories    │
+│ CyberArk    │  │ SshStrategy         │  │  Server · PatchJob  │
+│ (or Mock)   │  │ MockStrategy        │  │  ComplianceRecord   │
+└─────────────┘  └─────────────────────┘  └─────────────────────┘
+Key Package Breakdown
+Package	Contents
+config/	AsyncConfig, SecurityConfig, DataInitializer (seeds demo data), Scheduler
+controller/	13 MVC + REST controllers
+dto/	Data Transfer Objects (form → service)
+entity/	10 JPA entities (Server, PatchJob, Patch, AppUser, ComplianceRecord, etc.)
+enums/	PatchStatus, OsType, ComplianceStatus, Severity, ExecutionStrategy
+exception/	Custom exceptions + GlobalExceptionHandler
+integration/credential/	CredentialProvider interface → CyberArkCredentialProvider / MockCredentialProvider
+integration/execution/	RemoteExecutionStrategy interface → WinRmExecutionStrategy / SshExecutionStrategy / MockExecutionStrategy
+repository/	10 Spring Data JPA repositories
+service/impl/	11 service implementations (core business logic)
+3. Current Behavior — Demo Mode (Default)
+Right now application.yml has:
+
+yaml
+integration:
+  demo-mode: true   # ← everything is mocked
+What Happens in Demo Mode
+Job Execution Flow (Demo Mode)
+──────────────────────────────
+Create Job → PENDING
+    ↓
+Admin Approves → APPROVED
+    ↓
+Scheduler (every minute) OR manual trigger
+    ↓
+[MockCredentialProvider]
+   → Returns fake "Administrator / DemoPassword123!" — NO CyberArk call
+    ↓
+[MockExecutionStrategy]
+   → Sleeps with Thread.sleep() to simulate progress
+   → Prints realistic-looking apt-get / wusa.exe log lines
+   → Always returns SUCCESS (no real network call)
+    ↓
+COMPLETED → ComplianceRecord saved → Server marked COMPLIANT
+Factory classes (CredentialProviderFactory, ExecutionStrategyFactory) read the demo-mode flag at startup and inject the correct implementation:
+
+demo-mode: true → Mock classes
+demo-mode: false → Real CyberArk + WinRM/SSH classes
+Seeded Demo Data (auto-created on first startup)
+2 users: admin / Admin@123, user1 / User@123
+5 servers: Mix of Windows/Linux across PROD, DEV, STAGING
+6 patches: Critical/High/Medium severity
+3 patch jobs: PENDING, COMPLETED, FAILED
+3 maintenance windows
+Compliance records for all servers
+4. Job Execution Flow (Full Detail)
+[PatchJobServiceImpl.execute()]
+  ↓
+  1. Fetch credentials: credentialProvider.fetchCredential(server)
+        Demo  → MockCredentialProvider (fake)
+        Prod  → CyberArkCredentialProvider (REST call to CyberArk AIM API)
+  ↓
+  2. Resolve patch command:
+        Windows → wusa.exe /install KB<id>.msu /quiet /norestart
+        Linux   → apt-get update && apt-get install -y <package>
+        Custom  → patch.installCommand (if set)
+  ↓
+  3. Execute: remoteExecutionStrategy.execute(server, command, credential)
+        Demo    → MockExecutionStrategy (sleep + fake logs)
+        Windows → WinRmExecutionStrategy  (PowerShell Invoke-Command via ProcessBuilder)
+        Linux   → SshExecutionStrategy    (Apache Sshd client)
+  ↓
+  4. On SUCCESS → job = COMPLETED, server = COMPLIANT, ComplianceRecord saved
+     On FAILURE → job = FAILED,    server = NON_COMPLIANT, retry if retryCount < maxRetries
+  ↓
+  5. AuditLog entry written
+All execution is @Async — runs in a dedicated thread pool (patchExecutor, size = 10).
+UI polls /api/v1/jobs/{id}/status every few seconds to update job status.
+
+5. Steps to Integrate With Real Servers
+Step 1 — Flip the Master Switch
+In src/main/resources/application.yml:
+
+yaml
+integration:
+  demo-mode: false   # ← This single flag switches ALL integrations to real
+Step 2 — Configure Your Database
+Already done if the app is running. Ensure a production-grade PostgreSQL is used:
+
+yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://<YOUR_DB_HOST>:5432/patch_management
+    username: <DB_USER>
+    password: <DB_PASSWORD>
+    hikari:
+      maximum-pool-size: 20
+Step 3 — Configure CyberArk (Credential Management)
+yaml
+integration:
+  cyberark:
+    enabled: true
+    base-url: https://<YOUR_CYBERARK_HOST>/AIMWebService/api/Accounts
+    app-id: PatchMgmtApp
+    safe: PatchMgmtSafe
+    connection-timeout-seconds: 10
+    read-timeout-seconds: 15
+    verify-ssl: true   # false only for self-signed lab certs
+On the CyberArk side:
+
+Create an Application with ID PatchMgmtApp
+Grant it access to a safe (e.g., PatchMgmtSafe) containing server credentials
+Each server credential must be stored as an "Object" (e.g., WEB-PROD-01-admin)
+In the app UI:
+
+Go to Admin → Credentials
+Create a mapping per server:
+Select Server
+Enter Safe name (e.g., PatchMgmtSafe)
+Enter Object name (e.g., WEB-PROD-01-admin)
+At execution time, CyberArkCredentialProvider calls:
+GET https://<cyberark>/AIMWebService/api/Accounts?AppID=PatchMgmtApp&Safe=...&Object=...
+Retrieves UserName + Content (password). Password held in char[] and cleared immediately.
+
+Step 4 — Enable WinRM for Windows Servers
+yaml
+integration:
+  winrm:
+    enabled: true
+    port: 5985          # Use 5986 for HTTPS
+    use-https: false
+    timeout-seconds: 120
+    auth-scheme: basic
+On each Windows target server (run as Administrator):
+
+powershell
+# Enable WinRM
+Enable-PSRemoting -Force
+# Allow Basic Auth (required for this app's WinRM strategy)
+Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true
+# If using HTTP (not HTTPS), allow unencrypted
+Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value $true
+# Open firewall
+netsh advfirewall firewall add rule name="WinRM-HTTP" dir=in localport=5985 protocol=TCP action=allow
+In the app: Set each Windows server's Execution Strategy to WINRM (Servers → Edit Server).
+
+How it works in code: WinRmExecutionStrategy builds a PowerShell Invoke-Command via ProcessBuilder and passes credentials using New-Object PSCredential. Exits 0 = success.
+
+Step 5 — Enable SSH for Linux Servers
+yaml
+integration:
+  ssh:
+    enabled: true
+    port: 22
+    timeout-seconds: 120
+    strict-host-key-checking: false   # Set true in production with known_hosts file
+On each Linux target server:
+
+bash
+# Ensure SSH is running
+sudo systemctl enable ssh && sudo systemctl start ssh
+# Ensure patching user has sudo rights
+# /etc/sudoers or via visudo:
+patchuser ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/yum
+# Open firewall (ufw example)
+sudo ufw allow 22/tcp
+In the app: Set each Linux server's Execution Strategy to SSH (Servers → Edit Server).
+
+How it works in code: SshExecutionStrategy uses Apache Sshd client library to open a session, authenticate with username + password from CyberArk, run the patch command in an exec channel, and return stdout/exit code.
+
+Step 6 — Set Execution Strategy per Server
+In the app UI: Servers → Edit each server:
+
+Windows servers → WINRM
+Linux servers → SSH
+Or pre-populate via SQL / the DataInitializer.
+
+Step 7 — Verify Maintenance Windows
+Patch jobs are blocked if executed outside a configured maintenance window.
+In Maintenance Windows, create windows that cover your patching schedule:
+
+Weekly (e.g., every Saturday 2-6 AM)
+One-time (specific date-time window)
+Step 8 — Validate the Integration
+Register a real server in the app
+Create a credential mapping for it in CyberArk
+Create a patch job → Submit → Approve
+Click Execute or wait for scheduler to pick it up (runs every minute)
+Watch execution log appear in the job detail page (polled via AJAX every 3s)
+Verify compliance record updated on the Compliance page
+6. What Changes When You Flip demo-mode?
+Component	demo-mode: true	demo-mode: false
+Credential Provider	MockCredentialProvider (hardcoded fake)	CyberArkCredentialProvider (live REST call)
+Execution Strategy	MockExecutionStrategy (Thread.sleep + fake logs)	WinRmExecutionStrategy or SshExecutionStrategy
+Network calls	None	CyberArk AIM API + WinRM/SSH to target servers
+Seeded data	Auto-seeded demo servers/jobs/patches	You register real servers manually
+Risk	Zero (no external connections)	Real patches applied to real servers
+7. REST API (for external automation)
+Endpoint	Method	Description
+/api/v1/jobs	GET	List all patch jobs
+/api/v1/jobs/{id}	GET	Job details
+/api/v1/jobs/{id}/status	GET	Poll job status (used by UI AJAX)
+/api/v1/jobs/{id}/execute	POST	Trigger execution programmatically
+/api/v1/servers	GET	List all servers
+/api/v1/compliance	GET	Compliance summary
+/actuator/health	GET	App health (Admin only)
+8. Key Configuration Reference
+yaml
+# application.yml — full relevant section
+integration:
+  demo-mode: false        # FLIP THIS for production
+  cyberark:
+    enabled: true
+    base-url: https://cyberark.your-domain.com/AIMWebService/api/Accounts
+    app-id: PatchMgmtApp
+    safe: PatchMgmtSafe
+    verify-ssl: true
+  winrm:
+    enabled: true
+    port: 5985
+    use-https: false
+    timeout-seconds: 120
+    auth-scheme: basic
+  ssh:
+    enabled: true
+    port: 22
+    timeout-seconds: 120
+    strict-host-key-checking: false
+patch:
+  scheduler:
+    enabled: true
+    cron: "0 * * * * *"    # Every minute
+  execution:
+    max-retry-attempts: 3
+    retry-delay-seconds: 30
+    batch-size: 5
+    default-timeout-minutes: 30
+    thread-pool-size: 10
+	
+	
+9. What's NOT Yet Wired (Gaps to Be Aware Of)
+WARNING
+
+The WinRmExecutionStrategy uses powershell.exe via ProcessBuilder — this means the Spring Boot app itself must be running on a Windows machine (or a machine with PowerShell installed) for WinRM to work. On Linux-hosted applications, switch to a WinRM Java library like io.cloudsoft.winrm4j.
+
+NOTE
+
+strict-host-key-checking: false is set for SSH. In production, configure a known_hosts file and set it to true so the app verifies server identity.
+
+NOTE
+
+Currently there is no automated patch discovery — patches must be manually registered in the app. A real integration would pull available patches from WSUS (Windows) or a package repo (Linux) automatically.
